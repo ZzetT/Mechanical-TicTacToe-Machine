@@ -20,3 +20,6 @@ Under the following terms:
 This is a human-readable summary of (and not a substitute for) the license.
 Full legal code: https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
 Summary:         https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+Exception: the font files in the fonts/ folder are third-party fonts and
+remain under their own licenses (see fonts/README.md).

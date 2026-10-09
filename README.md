@@ -16,6 +16,7 @@ This repository contains everything used to design the machine:
 | `03_verify_rules.py` | Plays every possible game against the minimized rules to prove that 'O' never loses |
 | `minimized_rules.json` | The 65 rules that are printed as cards on the machine (read by `ttt_machine.py`) |
 | `ttt_machine.py` | [build123d](https://github.com/gumyr/build123d) CAD model of the whole machine (frames, rods, gears, knobs, stand and all 65 cards) |
+| `fonts/` | Fonts used for the text on the parts (bundled for reproducible exports) |
 
 ## Part 1: The lookup table
 
@@ -44,21 +45,37 @@ The pipeline is split into three automated steps:
 
 ## Part 2: The machine (CAD)
 
+### How the machine works
+
+**The board.** Each of the nine fields is a rod that runs from the front to the back of the machine. You move it with its knob on the front: left = O, center = empty, right = X. A magnet lets the rod snap into the center (empty) position, and spring clips in the mid frame hold it at the left and right ends. Gears rolling on racks keep its front and back ends in sync, and an indicator plate behind the cover window shows the X or O.
+
+**The cards.** All 65 logic cards are stacked between the front and back frame, and all nine rods pass through every card. Each card is one rule from the lookup table. For each field, the card has a cutout with a vertical drop slot above every rod position that the rule allows. For an `X` there is one slot on the right; for a `!` (X or empty) there are slots on the right and in the center; for a `?` the whole cutout is open.
+
+**Selecting a card.** After you have made your move as X, pull the release knob. A card can only drop if *all nine* rods are directly under one of its drop slots; a single rod in a different position holds it up. So only the card whose rule matches the current board drops, by 18 mm. (Sometimes two or three cards match the same board, but the lookup table guarantees that they all encode the same reply.)
+
+**Making the reply.** Pushing the release knob back in pushes the dropped card to the left. The rods now sit in a horizontal channel at the top of each cutout. For eight fields this channel is wide enough for the card to slide past the rod. Only at the field of O's reply is the channel only as wide as the rod, so the card takes that rod along and moves it from the center to the O position. The machine has made its move. (In the script, `create_field_sketch()` builds these cutouts and `create_card()` turns one rule into a card.)
+
+The [video](https://www.youtube.com/watch?v=0ECLzEu6Fs4) shows the mechanism in detail.
+
+### The CAD script
+
 `ttt_machine.py` is the parametric [build123d](https://github.com/gumyr/build123d) model of the machine. It reads the lookup table from `minimized_rules.json`, and each entry becomes one logic card (card *n* = the *n*-th entry in the file).
 
 It was developed with build123d 0.11, and the gears are generated with [py_gearworks](https://github.com/GarryBGoode/py_gearworks). The script is written in cells (`# %%`). If [OCP CAD Viewer](https://github.com/bernhard-42/vscode-ocp-cad-viewer) (`ocp_vscode`) is installed, the assembled machine is shown in the viewer. The viewer is optional: without it the model is still built, and you can export it as described below.
 
 ### Exporting STL files
 
-Exporting is disabled by default. To generate the printable files, change the flags near the end of `ttt_machine.py`:
+Pass flags on the command line (or set the `EXPORT_*` flags near the top of `ttt_machine.py` when running the cells interactively):
 
-```python
-export = True                         # all machine parts + full_assembly.stl
-export_cards = export and True        # all 65 cards as STL (+ first_three_cards.3mf)
-export_cards_as_svg = export and True # 2D outlines of all cards as SVG
+```bash
+python ttt_machine.py --export          # all machine parts + full_assembly.stl
+python ttt_machine.py --cards           # all 65 logic cards as STL (+ first_three_cards.3mf), takes a while
+python ttt_machine.py --svg             # 2D outlines of all cards as SVG
 ```
 
-The files are written to `export_b123d_84/` next to the script, already oriented for printing. Generating all 65 cards takes a while.
+The files are written to `export/` next to the script, already oriented for printing.
+
+All text on the parts (card numbers, cover lettering, indicator plates) uses the fonts bundled in [`fonts/`](fonts/README.md), so the exported geometry is identical on every computer.
 
 Ready-to-print files, print settings and the required hardware (M3 screws, 4×1 mm magnets) are listed on the [Printables page](https://www.printables.com/model/1745561-unbeatable-tic-tac-toe-machine-xxo-master).
 
@@ -83,7 +100,7 @@ Build or view the machine:
 
 ```bash
 python ttt_machine.py         # or run the cells in VS Code with OCP CAD Viewer open
-                              # (without the viewer, set export = True to get STL files)
+python ttt_machine.py --export --cards   # write all STL files to export/
 ```
 
 ## License

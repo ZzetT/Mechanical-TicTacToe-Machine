@@ -12,4 +12,5 @@ env.bak/
 venv.bak/
 
 # STL/3MF/SVG exports of ttt_machine.py
-export_b123d_*/
+export/
+.verify/
