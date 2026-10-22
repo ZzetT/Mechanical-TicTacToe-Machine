@@ -79,6 +79,10 @@ All text on the parts (card numbers, cover lettering, indicator plates) uses the
 
 Ready-to-print files, print settings and the required hardware (M3 screws, 4×1 mm magnets) are listed on the [Printables page](https://www.printables.com/model/1745561-unbeatable-tic-tac-toe-machine-xxo-master).
 
+### Easy reset (work in progress)
+
+[`RESET_PLAN.md`](RESET_PLAN.md) describes a modification that lets a child reset the machine after a game: pull the release knob, lift a lever, push the knob in, knobs to the middle. It keeps all 65 cards and the lookup table unchanged. The CAD script already contains the parts for it (`create_top_left_rod` with a 5 mm lip, `create_lifter`, `create_lever` and the slot in `create_stand_platform`); the card holding rod is no longer part of the assembly. The checks behind the plan are in [`reset_mod/`](reset_mod/).
+
 ## Installation & usage
 
 You'll need Python 3.10 or newer (the CAD script uses `match` statements). A virtual environment is recommended.

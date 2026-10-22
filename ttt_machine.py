@@ -196,7 +196,7 @@ stand_border_height = 6.0
 stand_border_thickness = 4.0
 stand_bottom_thickness = 5.0
 stand_leg_diameter = 16.0
-stand_leg_height = 30.0
+stand_leg_height = 48.0   # taller: the reset lever runs under the platform
 stand_leg_hole_depth = 3.0
 stand_leg_tolerance = 0.2
 stand_leg_hole_margin = 2.0
@@ -212,6 +212,52 @@ stand_inner_width = machine_width + stand_clearance * 2.0
 stand_inner_depth = machine_depth + stand_clearance * 2.0
 stand_outer_width = stand_inner_width + stand_border_thickness * 2.0
 stand_outer_depth = stand_inner_depth + stand_border_thickness * 2.0
+
+# --- Reset lifter in the stand (see RESET_PLAN.md) ---
+# A lifter bar with a soft foam strip pushes every dropped card up on its own;
+# the ramps in the cards then slide the cards back and reset the rods. The
+# lifter is driven by a lever shaft under the platform.
+top_left_rod_lip_height = 5.0        # height of the top-left rod between the frames (full height in the holders)
+lifter_bar_width = 6.0
+lifter_bar_height = 4.0
+lifter_bar_length = frame_to_frame_distance - frame_depth - 2.0     # fits between the frame plates
+lifter_rail_height = 2.0             # rails on the bar that locate the foam strip
+lifter_foam_height = 20.0            # soft strip glued on the bar (not printed)
+lifter_foam_gap = 1.0                # foam top below the dropped cards when the lever is down
+lifter_stroke = height_of_fall + lifter_foam_gap   # 19: foam top ends 0.4 mm below the cards at rest
+lifter_leg_length = 10.0
+lifter_leg_thickness = 4.0
+lifter_leg_spacing = 50.0
+lifter_foot_length = 25.0            # foot pad reaching towards the lever shaft
+lifter_foot_thickness = 3.0
+lifter_slot_clearance = 0.5
+lifter_rib_length = 7.0              # guide ribs under the platform at both ends of the bar
+lifter_rib_depth = 20.0
+lever_arm_radius = lifter_stroke     # the arm tip rises by the stroke over 90 degrees
+lever_tip_radius = 3.0
+lever_arm_thickness = 5.0
+lever_shaft_radius = 3.0
+lever_shaft_clearance = 0.3
+lever_shaft_offset_x = 20.0          # shaft axis to the right of the lifter bar
+lever_boss_width = 10.0
+lever_boss_thickness = 6.0
+lever_handle_length = 45.0           # ends below the bottom row of knobs when vertical
+lever_handle_height = 8.0
+lever_handle_thickness = 6.0
+
+# Positions in the stand's own coordinate system (X = width, Y = depth towards
+# the back, Z = up, origin at the centre of the platform bottom)
+machine_y_min = -frame_height/2 - card_frame_diff_height/2
+lifter_x = -cover_center_x                                                 # under the middle of the cards
+lifter_y = frame_to_frame_distance/2 + (machine_z_min + machine_z_max)/2   # middle of the card stack
+card_bottom_rest_z = -card_height/2 - (machine_y_min - stand_bottom_thickness)   # bottom edge of a card at rest
+lifter_foam_top_rest_z = card_bottom_rest_z - (height_of_fall + 0.4) - lifter_foam_gap
+lifter_bar_top_rest_z = lifter_foam_top_rest_z - lifter_foam_height
+lifter_foot_bottom_rest_z = lifter_bar_top_rest_z - lifter_bar_height - lifter_leg_length - lifter_foot_thickness
+lever_shaft_x = lifter_x + lever_shaft_offset_x
+lever_shaft_z = lifter_foot_bottom_rest_z - lever_tip_radius - 0.2
+lever_boss_y = lifter_bar_length/2 + lever_boss_thickness/2 + 2.0          # bosses just outside the bar ends
+lever_handle_y = -stand_outer_depth/2 - 9.0                                 # handle in front of the platform and the knobs
 
 # Release rod: vertical position of its slot in the frames
 release_tab_y = -4.2
@@ -846,13 +892,21 @@ def create_top_left_rod():
     with BuildPart() as p:
         Box(rod_w, rod_h, rod_length, align=(Align.CENTER, Align.CENTER, Align.MAX))
 
-        # Add T-Shape handle
-        with Locations((-rod_w/2, 0, -rod_length/2)):
+        # Between the frame plates only a lip at the top remains: a card that
+        # is lifted while still shifted to the left passes underneath it
+        # (see RESET_PLAN.md). Inside the rod holders the rod keeps its height.
+        mid_z0 = -rod_shell_extrude - frame_depth/2
+        mid_z1 = -rod_shell_extrude - frame_to_frame_distance + frame_depth/2
+        with Locations((0, rod_h/2 - top_left_rod_lip_height, (mid_z0 + mid_z1)/2)):
+            Box(rod_w + 2, rod_h, mid_z0 - mid_z1, align=(Align.CENTER, Align.MAX, Align.CENTER), mode=Mode.SUBTRACT)
+
+        # Add T-Shape handle (as tall as the lip, so the cards clear it too)
+        with Locations((-rod_w/2, rod_h/2, -rod_length/2)):
             # Handle arm extending outward
-            Box(top_left_handle_width, rod_h, top_left_handle_thickness, align=(Align.MAX, Align.CENTER, Align.CENTER))
+            Box(top_left_handle_width, top_left_rod_lip_height, top_left_handle_thickness, align=(Align.MAX, Align.MAX, Align.CENTER))
             # Cross bar of the T-shape
             with Locations((-top_left_handle_width, 0, 0)):
-                Box(top_left_handle_thickness, rod_h, top_left_t_cross_length, align=(Align.MAX, Align.CENTER, Align.CENTER))
+                Box(top_left_handle_thickness, top_left_rod_lip_height, top_left_t_cross_length, align=(Align.MAX, Align.MAX, Align.CENTER))
 
         with Locations((0, 0, -rod_shell_extrude/2), (0, 0, -rod_length + rod_shell_extrude/2)):
             with Locations((0, top_left_rod_height/2, 0)):
@@ -886,14 +940,9 @@ def create_right_rod():
     return p.part
 
 
-def create_card_holding_rod():
-    rod_length_total = frame_to_frame_distance + 2*frame_depth
-    with BuildPart() as p:
-        Box(card_holder_rod_size, card_holder_rod_size, rod_length_total)
-        edges_to_chamfer = p.edges().filter_by(Axis.Z).group_by(Axis.X)[-1]
-        chamfer(edges_to_chamfer, length=1)
-    p.part.label = "card_holding_rod"
-    return p.part
+# The card holding rod (a 3 mm rod at the bottom-left that locked dropped cards
+# in their shifted position) is no longer part of the machine: it would block
+# the reset lift (see RESET_PLAN.md). The frames keep their cut-outs for it.
 
 def double_d_profile(clearance=0.0):
     """Creates the D-shaped profile for knobs (with flat sides)."""
@@ -1169,7 +1218,82 @@ def create_stand_platform():
                 Circle(radius=stand_leg_diameter/2.0 + stand_leg_tolerance)
         extrude(amount=stand_leg_hole_depth, mode=Mode.SUBTRACT)
 
+        # --- reset lifter: slot for the bar and its foam strip
+        with BuildSketch(Plane.XY):
+            with Locations((lifter_x, lifter_y)):
+                Rectangle(lifter_bar_width + 2*lifter_slot_clearance, lifter_bar_length + 2*lifter_slot_clearance)
+        extrude(amount=stand_bottom_thickness + 1, mode=Mode.SUBTRACT)
+
+        # guide ribs under the platform at both ends of the bar
+        rib_x = lifter_bar_width/2 + lifter_slot_clearance + 1.0
+        rib_y = lifter_bar_length/2 - lifter_rib_length/2
+        with Locations((lifter_x - rib_x, lifter_y + rib_y, 0), (lifter_x + rib_x, lifter_y + rib_y, 0),
+                       (lifter_x - rib_x, lifter_y - rib_y, 0), (lifter_x + rib_x, lifter_y - rib_y, 0)):
+            Box(2.0, lifter_rib_length, lifter_rib_depth, align=(Align.CENTER, Align.CENTER, Align.MAX))
+
+        # bearing bosses for the lever shaft
+        boss_depth = -lever_shaft_z + lever_boss_width/2
+        with Locations((lever_shaft_x, lifter_y - lever_boss_y, 0), (lever_shaft_x, lifter_y + lever_boss_y, 0)):
+            Box(lever_boss_width, lever_boss_thickness, boss_depth, align=(Align.CENTER, Align.CENTER, Align.MAX))
+        with Locations((lever_shaft_x, lifter_y, lever_shaft_z)):
+            Cylinder(radius=lever_shaft_radius + lever_shaft_clearance, height=2*lever_boss_y + lever_boss_thickness + 2,
+                     rotation=(90, 0, 0), mode=Mode.SUBTRACT)
+
+        # stop blocks: the lever arm leans against them when it is vertical (end of stroke)
+        stop_x = lever_shaft_x + lever_arm_thickness/2 + 1.0 + 2.0
+        for y_sgn in [-1, 1]:
+            with Locations((stop_x, lifter_y + y_sgn * lifter_leg_spacing/2, 0)):
+                Box(4.0, lever_arm_thickness + 4, -(lever_shaft_z + 8.0), align=(Align.CENTER, Align.CENTER, Align.MAX))
+
+        # rest for the handle in front of the platform (keeps the lever horizontal when
+        # released): a fin beside the handle's swing plane with a foot under the handle
+        rest_top = lever_shaft_z - lever_handle_height/2 - 0.5
+        rest_x = lever_shaft_x - lever_handle_length + 12.0
+        rest_depth = -stand_outer_depth/2 - (lever_handle_y - lever_handle_thickness/2 - 1.0)   # reaches under the handle
+        with Locations((rest_x, -stand_outer_depth/2 + 0.01, stand_bottom_thickness)):
+            Box(6.0, 2.0, stand_bottom_thickness - rest_top + 3.0, align=(Align.CENTER, Align.MAX, Align.MAX))
+        with Locations((rest_x, -stand_outer_depth/2 + 0.01, rest_top)):
+            Box(6.0, rest_depth, 3.0, align=(Align.CENTER, Align.MAX, Align.MAX))
+
     p.part.label = "stand_platform"
+    return p.part
+
+
+def create_lifter():
+    """Bar with foam rails, two legs and two foot pads; the lever arms push the pads up.
+    Built with the top of the bar at Z = 0 and the bar centred on the origin."""
+    with BuildPart() as p:
+        Box(lifter_bar_width, lifter_bar_length, lifter_bar_height, align=(Align.CENTER, Align.CENTER, Align.MAX))
+        with Locations((-lifter_bar_width/2, 0, 0), (lifter_bar_width/2, 0, 0)):
+            Box(0.8, lifter_bar_length, lifter_rail_height, align=(Align.CENTER, Align.CENTER, Align.MIN))
+        for y_sgn in [-1, 1]:
+            with Locations((0, y_sgn * lifter_leg_spacing/2, -lifter_bar_height)):
+                Box(lifter_bar_width, lifter_leg_thickness, lifter_leg_length, align=(Align.CENTER, Align.CENTER, Align.MAX))
+            with Locations((-lifter_bar_width/2, y_sgn * lifter_leg_spacing/2, -lifter_bar_height - lifter_leg_length)):
+                Box(lifter_foot_length, lifter_leg_thickness, lifter_foot_thickness, align=(Align.MIN, Align.CENTER, Align.MAX))
+    p.part.label = "lifter"
+    return p.part
+
+
+def create_lever():
+    """Lever shaft with two arms under the lifter's feet and the handle in front of the
+    stand. Built around the shaft axis (along Y) at the origin, arms and handle pointing
+    to -X (lever down). Lifting the handle to vertical raises the lifter by lifter_stroke."""
+    shaft_y0 = lever_handle_y - lever_handle_thickness/2 - lifter_y
+    shaft_y1 = lever_boss_y + lever_boss_thickness/2 + 1.0
+    with BuildPart() as p:
+        with Locations((0, (shaft_y0 + shaft_y1)/2, 0)):
+            Cylinder(radius=lever_shaft_radius, height=shaft_y1 - shaft_y0, rotation=(90, 0, 0))
+        for y_sgn in [-1, 1]:
+            with BuildSketch(Plane.XZ.offset(-y_sgn * lifter_leg_spacing/2 - lever_arm_thickness/2)):
+                with Locations((-lever_arm_radius/2, 0)):
+                    SlotCenterToCenter(lever_arm_radius, 2*lever_tip_radius)
+            extrude(amount=lever_arm_thickness)
+        with Locations((0, lever_handle_y - lifter_y, 0)):
+            Box(lever_handle_length, lever_handle_thickness, lever_handle_height, align=(Align.MAX, Align.CENTER, Align.CENTER))
+            with Locations((-lever_handle_length, 0, 0)):
+                Cylinder(radius=lever_handle_height/2 + 1.0, height=lever_handle_thickness, rotation=(90, 0, 0))
+    p.part.label = "lever"
     return p.part
 
 def create_stand_leg():
@@ -1197,7 +1321,10 @@ def create_stand_assembly():
                 stand_leg_hole_depth - stand_leg_height
             ))))
 
-    assembly = Compound(children=[platform] + legs)
+    lifter = create_lifter().move(Location((lifter_x, lifter_y, lifter_bar_top_rest_z)))
+    lever = create_lever().move(Location((lever_shaft_x, lifter_y, lever_shaft_z)))
+
+    assembly = Compound(children=[platform] + legs + [lifter, lever])
     assembly.label = "stand_assembly"
     return assembly
 
@@ -1259,13 +1386,6 @@ top_right_rod = top_right_rod.move(Location((total_card_width/2+default_frame_ro
 bottom_right_rod = bottom_right_rod.move(Location((total_card_width/2+default_frame_rod_width/2-rod_shell_thickness/2, -frame_height/2+top_right_rod_height/2 - card_frame_diff_height/2, front_rod_holder_extension)))
 bottom_left_rod = bottom_left_rod.move(Location((-total_card_width/2-shift_left_distance-2-default_frame_rod_width/2+rod_shell_thickness/2, -frame_height/2+top_right_rod_height/2 - card_frame_diff_height/2, front_rod_holder_extension)))
 card.part.move(Location((0, 0, -10)))
-
-card_holding_rod = create_card_holding_rod()
-card_holding_rod_part = card_holding_rod.move(Location((
-    -total_card_width/2 - card_holder_rod_size/2 - 0.2,
-    -field_height/2 - height_of_fall,
-    -frame_to_frame_distance/2
-)))
 
 move_rod_loc = Location((-extra_space_to_right/2, -height_of_fall/2, -frame_to_frame_distance/2+move_rod_length/2))
 
@@ -1335,9 +1455,9 @@ release_rod_part = release_handle.move(Location((total_card_width/2 + 5.5, relea
 
 stand_platform_part = create_stand_platform()
 stand_leg_part = create_stand_leg()
+lifter_part = create_lifter()
+lever_part = create_lever()
 stand_assembly_part = create_stand_assembly()
-
-machine_y_min = -frame_height/2 - card_frame_diff_height/2
 
 stand_assembly_vis = stand_assembly_part.rotate(Axis.X, -90).move(Location((
     cover_center_x,
@@ -1369,7 +1489,6 @@ all_parts_for_show = [
      move_rod_assembly_bottom_center,
      move_rod_assembly_bottom_right,
      release_rod_part,
-     card_holding_rod_part,
      stand_assembly_vis
 ]
 
@@ -1408,9 +1527,10 @@ if EXPORT_PARTS:
         gear_back: None,
         knob_handle: Rotation(180, 0, 0),
         release_handle: Rotation(90, 0, 0),
-        card_holding_rod_part: Rotation(0, -90, 0),
         stand_platform_part: None,
-        stand_leg_part: None
+        stand_leg_part: None,
+        lifter_part: None,                      # bar on top, legs down: the bar bridges between the legs
+        lever_part: Rotation(90, 0, 0),         # flat: shaft, arms and handle in one plane
     }
 
     for part, rotation in objects_to_export.items():
